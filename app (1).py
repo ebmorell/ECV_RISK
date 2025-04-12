@@ -2,27 +2,32 @@ import streamlit as st
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
+import joblib
 import os
 import gdown
-import joblib
 
-from sksurv.ensemble import RandomSurvivalForest
+# --- ID del archivo en Google Drive (sustituye con el tuyo) ---
+MODEL_ID = "1YE0_SDXNQbI3G0WVxiXVdEpNnvuguope"  # ← Sustituye este valor con el ID real
+MODEL_FILENAME = "modelo_rsf_ecv.pkl"
 
-# --- DESCARGA AUTOMÁTICA DEL MODELO DESDE GOOGLE DRIVE ---
-MODEL_PATH = "modelo_rsf_ecv.pkl"
-MODEL_ID = "1HVDr9wccE5Go5tcyp0dwRIqAAtsqbzne"  # Sustituye por tu ID real
+# --- Descarga automática desde Drive si no existe ---
+if not os.path.exists(MODEL_FILENAME):
+    with st.spinner("Descargando modelo desde Google Drive..."):
+        url = f"https://drive.google.com/uc?id={MODEL_ID}"
+        gdown.download(url, MODEL_FILENAME, quiet=False)
 
-if not os.path.exists(MODEL_PATH):
-    st.info("Descargando modelo desde Google Drive...")
-    gdown.download(f"https://drive.google.com/uc?id={MODEL_ID}", MODEL_PATH, quiet=False)
+# --- Cargar modelo ---
+@st.cache_resource
+def load_model():
+    return joblib.load(MODEL_FILENAME)
 
-# --- CARGAR EL MODELO ---
-rsf = joblib.load(MODEL_PATH)
+rsf = load_model()
 
-st.title("Predicción del Riesgo de Evento Cardiovascular (ECV) en VIH")
-st.markdown("Introduce los datos del paciente para estimar su riesgo de ECV a 5 años.")
+# --- Interfaz ---
+st.title("Predicción de Riesgo de Evento Cardiovascular (ECV) en Personas con VIH")
+st.markdown("Introduce los datos clínicos del paciente para estimar su riesgo de ECV a 5 años.")
 
-# --- ENTRADA DE DATOS ---
+# --- Formulario de entrada ---
 def input_to_df():
     data = {
         "Sex": st.selectbox("Sexo", ["Hombre", "Mujer"]),
@@ -51,7 +56,7 @@ def input_to_df():
 
 input_df = input_to_df()
 
-# --- ENCODING MANUAL ---
+# --- Codificación manual (como en entrenamiento) ---
 encoding_dict = {
     "Sex": {"Hombre": 0, "Mujer": 1},
     "Transmission_mode": {"Homo/Bisexual": 0, "Heterosexual": 1, "Otros": 2},
@@ -70,36 +75,36 @@ encoding_dict = {
 for col in encoding_dict:
     input_df[col] = input_df[col].map(encoding_dict[col])
 
-# --- PREDICCIÓN ---
+# --- Predicción ---
 if st.button("Predecir riesgo de ECV"):
     pred_surv = rsf.predict_survival_function(input_df, return_array=True)
     time_points = rsf.event_times_
     t5_index = np.searchsorted(time_points, 5)
     risk_5yr = 1 - pred_surv[0][t5_index]
 
-    # --- CLASIFICACIÓN Y COLOR ---
+    # Clasificación de riesgo con colores
     if risk_5yr < 0.10:
-        risk_cat = "Bajo"
+        categoria = "Bajo"
         color = "green"
     elif risk_5yr < 0.20:
-        risk_cat = "Moderado"
+        categoria = "Moderado"
         color = "orange"
     else:
-        risk_cat = "Alto"
+        categoria = "Alto"
         color = "red"
 
     st.markdown(
-        f"<h3>Riesgo estimado de ECV a 5 años: <span style='color:{color}'>{risk_5yr:.2%} ({risk_cat})</span></h3>",
+        f"<h3>Riesgo estimado a 5 años: <span style='color:{color}'>{risk_5yr:.1%} ({categoria})</span></h3>",
         unsafe_allow_html=True
     )
 
-    # --- CURVA DE SUPERVIVENCIA ---
+    # Curva de supervivencia
     plt.figure(figsize=(8, 4))
-    plt.step(time_points, pred_surv[0], where="post", label="Supervivencia estimada")
+    plt.step(time_points, pred_surv[0], where="post", label="Curva de supervivencia")
     plt.axvline(5, color="red", linestyle="--", label="5 años")
-    plt.title("Curva de supervivencia")
     plt.xlabel("Tiempo (años)")
     plt.ylabel("Probabilidad de no tener ECV")
-    plt.legend()
+    plt.title("Curva de supervivencia estimada")
     plt.grid(True)
+    plt.legend()
     st.pyplot(plt)

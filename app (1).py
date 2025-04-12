@@ -10,7 +10,7 @@ from sksurv.ensemble import RandomSurvivalForest
 
 # --- DESCARGA AUTOMÁTICA DEL MODELO DESDE GOOGLE DRIVE ---
 MODEL_PATH = "modelo_rsf_ecv.pkl"
-MODEL_ID = "1uD_TItPxeG2vyW5KUh4eNcywguAmTTBI"  # Sustituye por tu ID real
+MODEL_ID = "1HVDr9wccE5Go5tcyp0dwRIqAAtsqbzne"  # Sustituye por tu ID real
 
 if not os.path.exists(MODEL_PATH):
     st.info("Descargando modelo desde Google Drive...")
